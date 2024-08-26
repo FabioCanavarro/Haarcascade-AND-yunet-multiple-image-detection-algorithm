@@ -71,13 +71,64 @@ def visualize(image, results, box_color=(0, 255, 0), text_color=(0, 0, 255)):
         for idx, landmark in enumerate(landmarks):
             cv.circle(output, landmark, 2, landmark_color[idx], 2)
     return output
+def pad_image_to_target(image, target_shape, pad_value=0):
+    height_diff = max(0, target_shape[0] - image.shape[0])
+    width_diff = max(0, target_shape[1] - image.shape[1])
+
+    top_pad = height_diff // 2
+    bottom_pad = height_diff - top_pad
+    left_pad = width_diff // 2
+    right_pad = width_diff - left_pad
+
+    
+    padding = ((top_pad, bottom_pad), (left_pad, right_pad))
+
+    if len(image.shape) == 3:
+        padding += ((0, 0),)
+
+    padded_image = np.pad(image, padding, mode='constant', constant_values=pad_value)
+
+    return padded_image
+def totaldetect(frames):
+    amount = 0
+    frame = frames.copy()
+    face_rect = face_classifier.detectMultiScale(frame,1.15,minNeighbors=3)
+    for (x,y,w,h) in face_rect:
+        face_rect = face_classifier.detectMultiScale(frame,1.15,minNeighbors=3)
+        frames = frame[y-5:y+h+5,x-5:x+w+5]
+        h, w, _ = frames.shape
+        model.setInputSize([w, h])
+        results = model.infer(frames)
+        xyy = visualize(frames,results)
+        xyy = pad_image_to_target(xyy,(frame[y-5:y+h+5,x-5:x+w+5].shape[0],frame[y-5:y+h+5,x-5:x+w+5].shape[1]))
+        if results.shape[0] != 0:
+            frame[y-5:y+h+5,x-5:x+w+5] = xyy
+        
+
+        amount+=results.shape[0]
+
+    return frame , amount
+
 
 model = YuNet(modelPath=r"models\face_detection_yunet_2023mar.onnx",inputSize=[640, 480])
-frame = cv2.imread(r"C:\Users\ASUS\Downloads\imgsss\wp11500678-solvay-conferences-wallpapers.jpg")
-h, w, _ = frame.shape
-model.setInputSize([w, h])
-detected = visualize(frame,model.infer(frame))
-cv2.imshow(f"frame",detected)
+frame = cv2.imread(r"Results\Input.jpg")
+face_classifier = cv2.CascadeClassifier(r"models\haarcascade_frontalface_default.xml")
+
+# for testing in jupyter notebook
+# def show(img,figsize=(20,10)):
+#     """ Takes an image array as a parameter and shows the image but bigger, useful in jupyter"""
+#     fig = plt.figure(figsize=figsize)
+#     ax = fig.add_subplot(111)
+#     ax.imshow(img,cmap= 'gray')
+
+
+detected = totaldetect(frame)
+
+
+
+
+cv2.imshow("frame",detected[0])
+print(detected[1])
 while True:
     a = cv2.waitKey(1) & 0XFF
     if a == 27:
